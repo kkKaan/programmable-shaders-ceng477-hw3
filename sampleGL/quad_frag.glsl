@@ -5,19 +5,18 @@ out vec4 fragColor;
 
 uniform float scale;
 uniform float offset;
-uniform float offsetZ;
 
 in vec3 FragPos;
 
 void main() {
     vec3 pos = gl_FragCoord.xyz; // Using screen coordinates
 
-    bool x = int((FragPos.x + offset) * scale) % 2 == 0;
-    bool y = int((FragPos.y + offset) * scale) % 2 == 0;
-    bool z = int((FragPos.z + offsetZ) * scale) % 2 == 0;
-    bool xorXY = x != y;
+    bool x = bool(int((FragPos.x) * scale + 4.f) % 2);
+    bool y = bool(int((FragPos.y) * scale) % 2);
+    bool z = bool(int((FragPos.z + offset) * scale) % 2);
+    bool xorXY = x != z;
 
-    if (xorXY != z) {
+    if (xorXY) {
         fragColor = vec4(0.0, 0.0, 0.0, 1.0); // Black
     } else {
         fragColor = vec4(1.0, 1.0, 1.0, 1.0); // White

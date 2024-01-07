@@ -6,6 +6,8 @@
 #include <iostream>
 #include <sstream>
 #include <vector>
+#include <cassert>
+#include <map>
 #define _USE_MATH_DEFINES
 #include <math.h>
 #include <GL/glew.h>
@@ -14,12 +16,14 @@
 #include <glm/glm.hpp> // GL Math library header
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp> 
+#include <ft2build.h>
+#include FT_FREETYPE_H
 
 #define BUFFER_OFFSET(i) ((char*)NULL + (i))
 
 using namespace std;
 
-GLuint gProgram[3];
+GLuint gProgram[4];
 int gWidth, gHeight;
 
 GLint modelingMatrixLoc[3];
@@ -32,10 +36,27 @@ glm::mat4 viewingMatrix;
 glm::mat4 modelingMatrix;
 glm::vec3 eyePos(0, 0, 0);
 
-float bunny_x = 0;
-float bunny_y = 0;
+float bunny_x = 0.0f;
+float bunny_y = 0.0f;
+float box_position_z = 0.0f;
+float quad_position_z = 0.0f;
 
-int activeProgramIndex = 0;
+float bunny_rotation_angle = 0.0f;
+
+float speed = 1.0f;
+
+float offset_before_hit_red;
+float coef_before_hit_red;
+
+int hit_red_index;
+int yellow_cube_index = rand() % 3;
+
+bool move_left = false;
+bool move_right = false;
+
+bool hit_red = false;
+bool hit_yellow = false;
+bool restart = false;
 
 struct Vertex
 {
@@ -71,10 +92,21 @@ struct Face
 	GLuint vIndex[3], tIndex[3], nIndex[3];
 };
 
+struct Character {
+    GLuint TextureID;   // ID handle of the glyph texture
+    glm::ivec2 Size;    // Size of glyph
+    glm::ivec2 Bearing;  // Offset from baseline to left/top of glyph
+    unsigned int Advance;    // Horizontal offset to advance to next glyph
+};
+
+std::map<GLchar, Character> Characters;
+
 vector<Vertex> gVertices[3];
 vector<Texture> gTextures[3];
 vector<Normal> gNormals[3];
 vector<Face> gFaces[3];
+
+GLuint gTextVBO;
 
 GLuint gVertexAttribBuffer[3], gIndexBuffer[3];
 GLint gInVertexLoc[3], gInNormalLoc[3];
@@ -300,10 +332,10 @@ GLuint createFS(const char* shaderName)
 void initShaders()
 {
 	// Create the programs
-
 	gProgram[0] = glCreateProgram();
 	gProgram[1] = glCreateProgram();
 	gProgram[2] = glCreateProgram();
+	gProgram[3] = glCreateProgram();
 
 	// Create the shaders for both programs
 
@@ -316,6 +348,9 @@ void initShaders()
 	GLuint vs3 = createVS("quad_vert.glsl");
 	GLuint fs3 = createFS("quad_frag.glsl");
 
+	GLuint vs4 = createVS("text_vert.glsl");
+	GLuint fs4 = createFS("text_frag.glsl");
+
 	// Attach the shaders to the programs
 
 	glAttachShader(gProgram[0], vs1);
@@ -326,6 +361,11 @@ void initShaders()
 
 	glAttachShader(gProgram[2], vs3);
 	glAttachShader(gProgram[2], fs3);
+
+	glAttachShader(gProgram[3], vs4);
+	glAttachShader(gProgram[3], fs4);
+
+    glBindAttribLocation(gProgram[3], 2, "vertex");
 
 	// Link the programs
 	GLint status;
@@ -357,6 +397,15 @@ void initShaders()
 		exit(-1);
 	}
 
+	glLinkProgram(gProgram[3]);
+	glGetProgramiv(gProgram[3], GL_LINK_STATUS, &status);
+
+	if (status != GL_TRUE)
+	{
+		cout << "Program link failed" << endl;
+		exit(-1);
+	}
+
 	// Get the locations of the uniform variables from both programs
 
 	for (int i = 0; i < 3; ++i)
@@ -366,6 +415,95 @@ void initShaders()
 		projectionMatrixLoc[i] = glGetUniformLocation(gProgram[i], "projectionMatrix");
 		eyePosLoc[i] = glGetUniformLocation(gProgram[i], "eyePos");
 	}
+}
+
+void initFonts(int windowWidth, int windowHeight)
+{
+    // Set OpenGL options
+    //glEnable(GL_CULL_FACE);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    glm::mat4 projection = glm::ortho(0.0f, static_cast<GLfloat>(windowWidth), 0.0f, static_cast<GLfloat>(windowHeight));
+    glUseProgram(gProgram[3]);
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[3], "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+
+    // FreeType
+    FT_Library ft;
+    // All functions return a value different than 0 whenever an error occurred
+    if (FT_Init_FreeType(&ft))
+    {
+        std::cout << "ERROR::FREETYPE: Could not init FreeType Library" << std::endl;
+    }
+
+    // Load font as face
+    FT_Face face;
+    if (FT_New_Face(ft, "/usr/share/fonts/truetype/liberation/LiberationSerif-Italic.ttf", 0, &face))
+    {
+        std::cout << "ERROR::FREETYPE: Failed to load font" << std::endl;
+    }
+
+    // Set size to load glyphs as
+    FT_Set_Pixel_Sizes(face, 0, 48);
+
+    // Disable byte-alignment restriction
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1); 
+
+    // Load first 128 characters of ASCII set
+    for (GLubyte c = 0; c < 128; c++)
+    {
+        // Load character glyph 
+        if (FT_Load_Char(face, c, FT_LOAD_RENDER))
+        {
+            std::cout << "ERROR::FREETYTPE: Failed to load Glyph" << std::endl;
+            continue;
+        }
+        // Generate texture
+        GLuint texture;
+        glGenTextures(1, &texture);
+        glBindTexture(GL_TEXTURE_2D, texture);
+        glTexImage2D(
+                GL_TEXTURE_2D,
+                0,
+                GL_RED,
+                face->glyph->bitmap.width,
+                face->glyph->bitmap.rows,
+                0,
+                GL_RED,
+                GL_UNSIGNED_BYTE,
+                face->glyph->bitmap.buffer
+                );
+        // Set texture options
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        // Now store character for later use
+        Character character = {
+            texture,
+            glm::ivec2(face->glyph->bitmap.width, face->glyph->bitmap.rows),
+            glm::ivec2(face->glyph->bitmap_left, face->glyph->bitmap_top),
+            static_cast<unsigned int>(face->glyph->advance.x)
+        };
+        Characters.insert(std::pair<GLchar, Character>(c, character));
+    }
+
+    glBindTexture(GL_TEXTURE_2D, 0);
+    // Destroy FreeType once we're finished
+    FT_Done_Face(face);
+    FT_Done_FreeType(ft);
+
+    //
+    // Configure VBO for texture quads
+    //
+    glGenBuffers(1, &gTextVBO);
+    glBindBuffer(GL_ARRAY_BUFFER, gTextVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * 6 * 4, NULL, GL_DYNAMIC_DRAW);
+
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), 0);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 void initVBO(int i)
@@ -434,7 +572,6 @@ void initVBO(int i)
 		indexData[3 * j + 2] = gFaces[i][j].vIndex[2];
 	}
 
-
 	glBufferData(GL_ARRAY_BUFFER, gVertexDataSizeInBytes[i] + gNormalDataSizeInBytes[i], 0, GL_STATIC_DRAW);
 	glBufferSubData(GL_ARRAY_BUFFER, 0, gVertexDataSizeInBytes[i], vertexData);
 	glBufferSubData(GL_ARRAY_BUFFER, gVertexDataSizeInBytes[i], gNormalDataSizeInBytes[i], normalData);
@@ -461,9 +598,11 @@ void init()
 	glEnable(GL_DEPTH_TEST);
 	initShaders();
 
+
 	initVBO(0);
 	initVBO(1);
 	initVBO(2);
+	initFonts(gWidth, gHeight);
 }
 
 void drawModel(int i)
@@ -477,18 +616,53 @@ void drawModel(int i)
 	glDrawElements(GL_TRIANGLES, gFaces[i].size() * 3, GL_UNSIGNED_INT, 0);
 }
 
-glm::vec3 getBunnyPosition() {
-    glm::vec3 bunnyPosition(0.0f);
-    int numVertices = gVertices[0].size(); // Assuming bunny vertices are at index 0
+void renderText(const std::string& text, GLfloat x, GLfloat y, GLfloat scale, glm::vec3 color)
+{
+    // Activate corresponding render state	
+    glUseProgram(gProgram[3]);
+    glUniform3f(glGetUniformLocation(gProgram[3], "textColor"), color.x, color.y, color.z);
+    glActiveTexture(GL_TEXTURE0);
 
-    for (int i = 0; i < numVertices; ++i) {
-        bunnyPosition.x += gVertices[0][i].x;
-        bunnyPosition.y += gVertices[0][i].y;
-        bunnyPosition.z += gVertices[0][i].z;
+    // Iterate through all characters
+    std::string::const_iterator c;
+    for (c = text.begin(); c != text.end(); c++) 
+    {
+        Character ch = Characters[*c];
+
+        GLfloat xpos = x + ch.Bearing.x * scale;
+        GLfloat ypos = y - (ch.Size.y - ch.Bearing.y) * scale;
+
+        GLfloat w = ch.Size.x * scale;
+        GLfloat h = ch.Size.y * scale;
+
+        // Update VBO for each character
+        GLfloat vertices[6][4] = {
+            { xpos,     ypos + h,   0.0, 0.0 },            
+            { xpos,     ypos,       0.0, 1.0 },
+            { xpos + w, ypos,       1.0, 1.0 },
+
+            { xpos,     ypos + h,   0.0, 0.0 },
+            { xpos + w, ypos,       1.0, 1.0 },
+            { xpos + w, ypos + h,   1.0, 0.0 }           
+        };
+
+        // Render glyph texture over quad
+        glBindTexture(GL_TEXTURE_2D, ch.TextureID);
+
+        // Update content of VBO memory
+        glBindBuffer(GL_ARRAY_BUFFER, gTextVBO);
+        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices); // Be sure to use glBufferSubData and not glBufferData
+
+        //glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+        // Render quad
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        // Now advance cursors for next glyph (note that advance is number of 1/64 pixels)
+
+        x += (ch.Advance >> 6) * scale; // Bitshift by 6 to get value in pixels (2^6 = 64 (divide amount of 1/64th pixels by 64 to get amount of pixels))
     }
 
-    bunnyPosition /= static_cast<float>(numVertices);
-    return bunnyPosition;
+    glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 void display()
@@ -498,21 +672,45 @@ void display()
 	glClearStencil(0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
-	static float angle = 0;
-
 	float knocked = glm::radians(0.0f);
 
-	float angleRad = (float)(angle / 180.0) * M_PI;
+	if (speed >= 1.0f) speed += 0.0015f;
 
-	float rotationAngle = glm::radians(270.0f);
+	if (move_left && bunny_x > -3.5f) {
+		bunny_x -= 0.05f * speed;
+	}
 
-	glm::mat4 transformMatrix = glm::mat4(1.0);
+	if (move_right && bunny_x < 3.5f) {
+		bunny_x += 0.05f * speed;
+	}
+
+	// Adjust bunny_y to move bunny up and down in time
+	bunny_y += 0.01f * speed;
+
+	box_position_z += 0.1f;
+
+	quad_position_z += 0.05f;
+
 	// Compute the modeling matrix for the bunny
-    transformMatrix = glm::translate(transformMatrix, glm::vec3(bunny_x, 0.3 * sin(10 * bunny_y * 1.0f) - 0.3f, -3.f));
+	glm::mat4 transformMatrix = glm::mat4(1.0);
+    transformMatrix = glm::translate(transformMatrix, glm::vec3(bunny_x, 0.2 * cos(10 * bunny_y * 1.0f) - 2.0f, -3.0f));
 	// Add rotation to the bunny's modeling matrix with 270 degrees rotation around the y axis
-	transformMatrix = glm::rotate(transformMatrix, rotationAngle, glm::vec3(0, 1, 0));
-	// Add rotation to the bunny's modeling matrix with 270 degrees rotation around the y axis
-	transformMatrix = glm::rotate(transformMatrix, knocked, glm::vec3(1, 0, 0));
+	transformMatrix = glm::rotate(transformMatrix, glm::radians(270.0f), glm::vec3(0, 1, 0));
+
+	if (hit_yellow && bunny_rotation_angle < 360.0f) {
+		bunny_rotation_angle = min(360.0f, bunny_rotation_angle + 3.0f * speed);
+		transformMatrix = glm::rotate(transformMatrix, glm::radians(bunny_rotation_angle), glm::vec3(0, 1, 0));
+	}
+
+	else if (hit_yellow && bunny_rotation_angle >= 360.0f) {
+		hit_yellow = false;
+		bunny_rotation_angle = 0.0f;
+	}
+
+	if (hit_red) {
+		transformMatrix = glm::rotate(transformMatrix, glm::radians(-90.0f), glm::vec3(1, 0, 0));
+	}
+
 	// Scale the bunny to 1/10 of its original size
 	transformMatrix = glm::scale(transformMatrix, glm::vec3(0.3f, 0.3f, 0.3f));
 
@@ -526,25 +724,80 @@ void display()
     // Draw Bunny
     drawModel(0);
 
-	// Compute the modeling matrix for the cube
-	glm::mat4 cubeTransformMatrix = glm::mat4(1.0);
-	// Add rotation to the cube's modeling matrix with 270 degrees rotation around the y axis
-	cubeTransformMatrix = glm::rotate(cubeTransformMatrix, rotationAngle, glm::vec3(0, 1, 0));
-	// Scale the cube to 1/10 of its original size
-	cubeTransformMatrix = glm::scale(cubeTransformMatrix, glm::vec3(0.99f, 0.99f, 0.99f));
+	if (-30.0f + box_position_z * speed * 0.7f > -1.0f) {
+		box_position_z = 0.0f;
+		yellow_cube_index = rand() % 3;
+	}
 
-	// Set the active program and the values of its uniform variables for the cube
-	glUseProgram(gProgram[1]);
+	for (int i = 0; i < 3; i++) {
+		float position_x;
+		switch (i) {
+			case 0:
+				position_x = -2.5f;
+				break;
+			case 1:
+				position_x = 0.0f;
+				break;
+			case 2:
+				position_x = 2.5f;
+				break;
+		}
 
-	glUniformMatrix4fv(projectionMatrixLoc[1], 1, GL_FALSE, glm::value_ptr(projectionMatrix));
-	glUniformMatrix4fv(viewingMatrixLoc[1], 1, GL_FALSE, glm::value_ptr(viewingMatrix));
-	glUniformMatrix4fv(modelingMatrixLoc[1], 1, GL_FALSE, glm::value_ptr(cubeTransformMatrix));
-	glUniform3fv(eyePosLoc[1], 1, glm::value_ptr(eyePos));
+		if (bunny_x < position_x + 0.75f && bunny_x > position_x - 0.75f && -30.0f + box_position_z * speed * 0.7f >= -4.25f) {
+			if (i == yellow_cube_index) {
+				cout << "You win!" << endl;
+				hit_yellow = true;
+			}
+			else {
+				cout << "You lose!" << endl;
+				hit_red_index = i;
+				hit_red = true;
+			}
 
-	// Draw Cube
-	drawModel(1);
+			continue;
+		}
 
-	float groundRotationAngle = glm::radians(-70.0f);
+		if (hit_red && i == hit_red_index) continue;
+
+		if (!hit_red) coef_before_hit_red = box_position_z * speed;
+
+		// Compute the modeling matrix for the cube
+		glm::mat4 cubeTransformMatrix = glm::mat4(1.0);
+
+		if (hit_red) {
+			cubeTransformMatrix = glm::translate(cubeTransformMatrix, glm::vec3(position_x, -1.5f, -30.0f + coef_before_hit_red * 0.7f));
+		}
+		else {
+			cubeTransformMatrix = glm::translate(cubeTransformMatrix, glm::vec3(position_x, -1.5f, -30.0f + box_position_z * speed * 0.7f));
+		}
+
+		// Add rotation to the cube's modeling matrix with 270 degrees rotation around the y axis
+		cubeTransformMatrix = glm::rotate(cubeTransformMatrix, glm::radians(5.0f), glm::vec3(1, 0, 0));
+		// Scale the cube to 1/10 of its original size
+		cubeTransformMatrix = glm::scale(cubeTransformMatrix, glm::vec3(0.4f, 1.0f, 0.25f));
+
+		// Set the active program and the values of its uniform variables for the cube
+		glUseProgram(gProgram[1]);
+
+		if (i == yellow_cube_index) {
+			glUniform3f(glGetUniformLocation(gProgram[1], "kd"), 1.0f, 1.0f, 0.0f);
+		}
+		else {
+			glUniform3f(glGetUniformLocation(gProgram[1], "kd"), 1.0f, 0.0f, 0.0f);
+		}
+
+		glUniformMatrix4fv(projectionMatrixLoc[1], 1, GL_FALSE, glm::value_ptr(projectionMatrix));
+		glUniformMatrix4fv(viewingMatrixLoc[1], 1, GL_FALSE, glm::value_ptr(viewingMatrix));
+		glUniformMatrix4fv(modelingMatrixLoc[1], 1, GL_FALSE, glm::value_ptr(cubeTransformMatrix));
+		glUniform3fv(eyePosLoc[1], 1, glm::value_ptr(eyePos));
+
+		// Draw Cube
+		drawModel(1);
+	}
+
+	if (!hit_red) offset_before_hit_red = quad_position_z * speed;
+
+	float groundRotationAngle = glm::radians(-90.0f);
 	glm::vec3 groundTranslation(0.0f, 0.0f, -3.0f);
 	glm::mat4 groundTransformMatrix = glm::mat4(1.0);
 	groundTransformMatrix = glm::rotate(groundTransformMatrix, groundRotationAngle, glm::vec3(1, 0, 0));
@@ -554,9 +807,14 @@ void display()
 	glUseProgram(gProgram[2]);
 
 	// Set uniform variables for checkerboard pattern
-	glUniform1f(glGetUniformLocation(gProgram[2], "scale"), 1.0f); // Adjust scale as needed
-	glUniform1f(glGetUniformLocation(gProgram[2], "offset"), 5.0f); // Adjust width as needed
-	glUniform1f(glGetUniformLocation(gProgram[2], "offsetZ"), 1.0f); // Adjust Z offset as needed
+	glUniform1f(glGetUniformLocation(gProgram[2], "scale"), 0.5f); // Adjust scale as needed
+
+	if (hit_red) {
+		glUniform1f(glGetUniformLocation(gProgram[2], "offset"), offset_before_hit_red);
+	}
+	else {
+		glUniform1f(glGetUniformLocation(gProgram[2], "offset"), quad_position_z * speed); // Adjust width as needed
+	}
 
 	// Set the active program and the values of its uniform variables for the quad
 	glUniformMatrix4fv(projectionMatrixLoc[2], 1, GL_FALSE, glm::value_ptr(projectionMatrix));
@@ -566,6 +824,12 @@ void display()
 
 	// Draw Quad
 	drawModel(2);
+
+	if (hit_red) speed = 0.0f;
+
+	// Draw text
+	std::string text = "Press R to restart";
+	renderText(text, 0.0f, 0.0f, 1.0f, glm::vec3(1.0f, 1.0f, 0.0f));
 }
 
 void reshape(GLFWwindow* window, int w, int h)
@@ -597,29 +861,31 @@ void keyboard(GLFWwindow* window, int key, int scancode, int action, int mods)
 	{
 		glfwSetWindowShouldClose(window, GLFW_TRUE);
 	}
-	else if (key == GLFW_KEY_G && action == GLFW_PRESS)
-	{
-		activeProgramIndex = 0;
+	else if (key == GLFW_KEY_A && action == GLFW_PRESS)
+	{	if(!hit_red){
+			move_left = true;
+		}
 	}
-	else if (key == GLFW_KEY_P && action == GLFW_PRESS)
-	{
-		activeProgramIndex = 1;
+	else if (key == GLFW_KEY_A && action == GLFW_RELEASE)
+	{	
+		move_left = false;
 	}
-	else if (key == GLFW_KEY_F && action == GLFW_PRESS)
-	{
-		glShadeModel(GL_FLAT);
+	else if (key == GLFW_KEY_D && action == GLFW_PRESS)
+	{	if(!hit_red){
+			move_right = true;
+		}
 	}
-	else if (key == GLFW_KEY_S && action == GLFW_PRESS)
+	else if (key == GLFW_KEY_D && action == GLFW_RELEASE)
 	{
-		glShadeModel(GL_SMOOTH);
+		move_right = false;
 	}
-	else if (key == GLFW_KEY_W && action == GLFW_PRESS)
+	else if (key == GLFW_KEY_R && action == GLFW_PRESS)
 	{
-		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+		restart = true;
 	}
-	else if (key == GLFW_KEY_E && action == GLFW_PRESS)
+	else if (key == GLFW_KEY_R && action == GLFW_RELEASE)
 	{
-		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+		restart = false;
 	}
 }
 
@@ -627,6 +893,25 @@ void mainLoop(GLFWwindow* window)
 {
 	while (!glfwWindowShouldClose(window))
 	{
+		if (restart) {
+			bunny_x = 0.0f;
+			bunny_y = 0.0f;
+			box_position_z = 0.0f;
+			quad_position_z = 0.0f;
+
+			bunny_rotation_angle = 0.0f;
+
+			speed = 1.0f;
+
+			yellow_cube_index = rand() % 3;
+
+			move_left = false;
+			move_right = false;
+
+			hit_red = false;
+			hit_yellow = false;
+		}
+
 		display();
 		glfwSwapBuffers(window);
 		glfwPollEvents();

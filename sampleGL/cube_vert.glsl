@@ -15,7 +15,7 @@ uniform vec3 kd;
 vec3 ka = vec3(0.3, 0.3, 0.3);   // ambient reflectance coefficient
 
 // Adjusted specular reflectance for a yellowish highlight
-vec3 ks = vec3(8.0, 8.0, 8.0);   // can be further Adjusted for shininess.
+vec3 ks = vec3(1.0, 1.0, 1.0);   // can be further Adjusted for shininess.
 
 vec3 lightPos = vec3(5, 5, 5);   // light position in world coordinates
 

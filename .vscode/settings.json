@@ -9,6 +9,8 @@
         "sstream": "cpp",
         "ios": "cpp",
         "locale": "cpp",
-        "random": "cpp"
+        "random": "cpp",
+        "complex": "cpp",
+        "valarray": "cpp"
     }
 }
