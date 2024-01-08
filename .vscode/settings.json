@@ -11,6 +11,10 @@
         "locale": "cpp",
         "random": "cpp",
         "complex": "cpp",
-        "valarray": "cpp"
+        "valarray": "cpp",
+        "iosfwd": "cpp",
+        "chrono": "cpp",
+        "limits": "cpp",
+        "algorithm": "cpp"
     }
 }

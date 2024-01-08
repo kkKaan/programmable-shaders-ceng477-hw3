@@ -48,8 +48,6 @@ float offset_before_hit_red;
 float coef_before_hit_red;
 
 int hit_red_index;
-// initialize yellow_cube_index to a random number between 0 and 2 give time seed
-
 int yellow_cube_index = 0;
 
 bool move_left = false;
@@ -79,7 +77,8 @@ struct Normal
 
 struct Face
 {
-	Face(int v[], int t[], int n[]) {
+	Face(int v[], int t[], int n[])
+    {
 		vIndex[0] = v[0];
 		vIndex[1] = v[1];
 		vIndex[2] = v[2];
@@ -103,7 +102,8 @@ GLint gInVertexLoc[3], gInNormalLoc[3];
 int gVertexDataSizeInBytes[3], gNormalDataSizeInBytes[3];
 
 /// Holds all state information relevant to a character as loaded using FreeType
-struct Character {
+struct Character
+{
     GLuint TextureID;   // ID handle of the glyph texture
     glm::ivec2 Size;    // Size of glyph
     glm::ivec2 Bearing;  // Offset from baseline to left/top of glyph
@@ -116,7 +116,6 @@ std::map<GLchar, Character> Characters;
 bool ParseObj(const string& fileName, int i)
 {
     fstream myfile;
-
     // Open the input 
     myfile.open(fileName.c_str(), std::ios::in);
 
@@ -190,70 +189,26 @@ bool ParseObj(const string& fileName, int i)
                 }
             }
 
-            //data += curLine;
             if (!myfile.eof())
             {
                 //data += "\n";
             }
         }
-
         myfile.close();
     }
     else
     {
         return false;
     }
-
-	/*
-	for (int i = 0; i < gVertices.size(); ++i)
-	{
-		Vector3 n;
-
-		for (int j = 0; j < gFaces.size(); ++j)
-		{
-			for (int k = 0; k < 3; ++k)
-			{
-				if (gFaces[j].vIndex[k] == i)
-				{
-					// face j contains vertex i
-					Vector3 a(gVertices[gFaces[j].vIndex[0]].x, 
-							  gVertices[gFaces[j].vIndex[0]].y,
-							  gVertices[gFaces[j].vIndex[0]].z);
-
-					Vector3 b(gVertices[gFaces[j].vIndex[1]].x, 
-							  gVertices[gFaces[j].vIndex[1]].y,
-							  gVertices[gFaces[j].vIndex[1]].z);
-
-					Vector3 c(gVertices[jgFaces[j].vIndex[2]].x, 
-							  gVertices[gFaces[j].vIndex[2]].y,
-							  gVertices[gFaces[j].vIndex[2]].z);
-
-					Vector3 ab = b - a;
-					Vector3 ac = c - a;
-					Vector3 normalFromThisFace = (ab.cross(ac)).getNormalized();
-					n += normalFromThisFace;
-				}
-
-			}
-		}
-
-		n.normalize();
-
-		gNormals.push_back(Normal(n.x, n.y, n.z));
-	}
-	*/
-
 	assert(gVertices[i].size() == gNormals[i].size());
-
     return true;
 }
 
 bool ReadDataFromFile(
-    const string& fileName, ///< [in]  Name of the shader file
-    string&       data)     ///< [out] The contents of the file
+    const string& fileName, // < [in]  Name of the shader file
+    string&       data)     // < [out] The contents of the file
 {
     fstream myfile;
-
     // Open the input 
     myfile.open(fileName.c_str(), std::ios::in);
 
@@ -283,7 +238,6 @@ bool ReadDataFromFile(
 void createVS(GLuint& program, const string& filename)
 {
     string shaderSource;
-
     if (!ReadDataFromFile(filename, shaderSource))
     {
         cout << "Cannot find file name: " + filename << endl;
@@ -344,8 +298,8 @@ void initShaders()
     createVS(gProgram[2], "quad_vert.glsl");
     createFS(gProgram[2], "quad_frag.glsl");
 
-    createVS(gProgram[3], "vert_text.glsl");
-    createFS(gProgram[3], "frag_text.glsl");
+    createVS(gProgram[3], "text_vert.glsl");
+    createFS(gProgram[3], "text_frag.glsl");
 
     glBindAttribLocation(gProgram[0], 0, "inVertex");
     glBindAttribLocation(gProgram[0], 1, "inNormal");
@@ -362,8 +316,6 @@ void initShaders()
 
     for (int i = 0; i < 3; ++i)
 	{
-        // if (i == 2) continue; // skip text shader
-
 		modelingMatrixLoc[i] = glGetUniformLocation(gProgram[i], "modelingMatrix");
 		viewingMatrixLoc[i] = glGetUniformLocation(gProgram[i], "viewingMatrix");
 		projectionMatrixLoc[i] = glGetUniformLocation(gProgram[i], "projectionMatrix");
@@ -449,7 +401,7 @@ void initVBO(int j)
 void initFonts(int windowWidth, int windowHeight)
 {
     // Set OpenGL options
-    //glEnable(GL_CULL_FACE);
+    // glEnable(GL_CULL_FACE);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
@@ -507,12 +459,14 @@ void initFonts(int windowWidth, int windowHeight)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
         // Now store character for later use
-        Character character = {
+        Character character =
+        {
             texture,
             glm::ivec2(face->glyph->bitmap.width, face->glyph->bitmap.rows),
             glm::ivec2(face->glyph->bitmap_left, face->glyph->bitmap_top),
-            face->glyph->advance.x
+            static_cast<unsigned int> (face->glyph->advance.x)
         };
         Characters.insert(std::pair<GLchar, Character>(c, character));
     }
@@ -598,7 +552,7 @@ void renderText(const std::string& text, GLfloat x, GLfloat y, GLfloat scale, gl
         glBindBuffer(GL_ARRAY_BUFFER, gTextVBO);
         glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices); // Be sure to use glBufferSubData and not glBufferData
 
-        //glBindBuffer(GL_ARRAY_BUFFER, 0);
+        // glBindBuffer(GL_ARRAY_BUFFER, 0);
 
         // Render quad
         glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -610,7 +564,6 @@ void renderText(const std::string& text, GLfloat x, GLfloat y, GLfloat scale, gl
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-
 void display()
 {
     glClearColor(0, 0, 0, 1);
@@ -620,11 +573,13 @@ void display()
 
 	if (speed >= 1.0f) speed += 0.0015f;
 
-	if (move_left && bunny_x > -3.5f) {
+	if (move_left && bunny_x > -3.5f)
+    {
 		bunny_x -= 0.05f * speed;
 	}
 
-	if (move_right && bunny_x < 3.5f) {
+	if (move_right && bunny_x < 3.5f)
+    {
 		bunny_x += 0.05f * speed;
 	}
 
@@ -641,17 +596,24 @@ void display()
 	// Add rotation to the bunny's modeling matrix with 270 degrees rotation around the y axis
 	transformMatrix = glm::rotate(transformMatrix, glm::radians(270.0f), glm::vec3(0, 1, 0));
 
-	if (hit_yellow && bunny_rotation_angle < 360.0f) {
+	if ((hit_yellow || (bunny_rotation_angle > 0.0) ) && bunny_rotation_angle < 360.0f)
+	{
 		bunny_rotation_angle = min(360.0f, bunny_rotation_angle + 3.0f * speed);
 		transformMatrix = glm::rotate(transformMatrix, glm::radians(bunny_rotation_angle), glm::vec3(0, 1, 0));
-	}
 
-	else if (hit_yellow && bunny_rotation_angle >= 360.0f) {
-		hit_yellow = false;
-		bunny_rotation_angle = 0.0f;
+		if (bunny_rotation_angle >= 360.0f)
+		{
+			bunny_rotation_angle = 0.0f;
+		}
 	}
+	// else if (hit_yellow && bunny_rotation_angle >= 360.0f)
+    // {
+	// 	hit_yellow = false;
+	// 	bunny_rotation_angle = 0.0f;
+	// }
 
-	if (hit_red) {
+	if (hit_red)
+	{
 		transformMatrix = glm::rotate(transformMatrix, glm::radians(-90.0f), glm::vec3(1, 0, 0));
 	}
 
@@ -668,14 +630,20 @@ void display()
     // Draw Bunny
     drawModel(0);
 
-	if (-30.0f + box_position_z * speed * 0.7f > -1.0f) {
+	if (-30.0f + box_position_z * speed * 0.7f > -1.0f)
+    {
 		box_position_z = 0.0f;
 		yellow_cube_index = rand() % 3;
+        hit_yellow = false;
 	}
 
-	for (int i = 0; i < 3; i++) {
+	for (int i = 0; i < 3; i++)
+    {
 		float position_x;
-		switch (i) {
+        if (hit_yellow && i == yellow_cube_index) continue;
+
+		switch (i)
+        {
 			case 0:
 				position_x = -2.5f;
 				break;
@@ -687,17 +655,19 @@ void display()
 				break;
 		}
 
-		if (bunny_x < position_x + 0.75f && bunny_x > position_x - 0.75f && -30.0f + box_position_z * speed * 0.7f >= -4.25f && -30.0f + box_position_z * speed * 0.7f <= 0.0f) {
-			if (i == yellow_cube_index) {
+		if (bunny_x < position_x + 0.75f && bunny_x > position_x - 0.75f && -30.0f + box_position_z * speed * 0.7f >= -4.25f && -30.0f + box_position_z * speed * 0.7f <= 0.0f)
+        {
+			if (i == yellow_cube_index)
+            {
 				cout << "You win!" << endl;
 				hit_yellow = true;
 			}
-			else {
+			else
+            {
 				cout << "You lose!" << endl;
 				hit_red_index = i;
 				hit_red = true;
 			}
-
 			continue;
 		}
 
@@ -708,10 +678,12 @@ void display()
 		// Compute the modeling matrix for the cube
 		glm::mat4 cubeTransformMatrix = glm::mat4(1.0);
 
-		if (hit_red) {
+		if (hit_red)
+        {
 			cubeTransformMatrix = glm::translate(cubeTransformMatrix, glm::vec3(position_x, -1.5f, -30.0f + coef_before_hit_red * 0.7f));
 		}
-		else {
+		else
+        {
 			cubeTransformMatrix = glm::translate(cubeTransformMatrix, glm::vec3(position_x, -1.5f, -30.0f + box_position_z * speed * 0.7f));
 		}
 
@@ -723,10 +695,12 @@ void display()
 		// Set the active program and the values of its uniform variables for the cube
 		glUseProgram(gProgram[1]);
 
-		if (i == yellow_cube_index) {
+		if (i == yellow_cube_index)
+        {
 			glUniform3f(glGetUniformLocation(gProgram[1], "kd"), 1.0f, 1.0f, 0.0f);
 		}
-		else {
+		else
+        {
 			glUniform3f(glGetUniformLocation(gProgram[1], "kd"), 1.0f, 0.0f, 0.0f);
 		}
 
@@ -753,10 +727,12 @@ void display()
 	// Set uniform variables for checkerboard pattern
 	glUniform1f(glGetUniformLocation(gProgram[2], "scale"), 0.5f); // Adjust scale as needed
 
-	if (hit_red) {
+	if (hit_red) 
+    {
 		glUniform1f(glGetUniformLocation(gProgram[2], "offset"), offset_before_hit_red);
 	}
-	else {
+	else
+    {
 		glUniform1f(glGetUniformLocation(gProgram[2], "offset"), quad_position_z * speed); // Adjust width as needed
 	}
 
@@ -793,8 +769,7 @@ void reshape(GLFWwindow* window, int w, int h)
 	// Assume default camera position and orientation (camera is at
 	// (0, 0, 0) with looking at -z direction and its up vector p3]ointing
 	// at +y direction)
-	// 
-	//viewingMatrix = glm::mat4(1);
+	// viewingMatrix = glm::mat4(1);
 	viewingMatrix = glm::lookAt(glm::vec3(0, 0, 0), glm::vec3(0, 0, 0) + glm::vec3(0, 0, -1), glm::vec3(0, 1, 0));
 }
 
@@ -868,7 +843,6 @@ int main(int argc, char** argv)   // Create Main Function For Bringing It All To
     {
         exit(-1);
     }
-
     srand(static_cast<unsigned int>(time(NULL)));
 	yellow_cube_index = rand() % 3;
 
@@ -914,4 +888,3 @@ int main(int argc, char** argv)   // Create Main Function For Bringing It All To
 
     return 0;
 }
-
