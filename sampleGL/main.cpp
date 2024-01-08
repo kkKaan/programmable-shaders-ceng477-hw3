@@ -50,7 +50,6 @@ float offset_before_hit_red;
 float coef_before_hit_red;
 
 int hit_red_index;
-// initialize yellow_cube_index to a random number between 0 and 2 give time seed
 
 int yellow_cube_index = 0;
 
@@ -700,15 +699,20 @@ void display()
 	// Add rotation to the bunny's modeling matrix with 270 degrees rotation around the y axis
 	transformMatrix = glm::rotate(transformMatrix, glm::radians(270.0f), glm::vec3(0, 1, 0));
 
-	if (hit_yellow && bunny_rotation_angle < 360.0f) {
+	if ((hit_yellow || (bunny_rotation_angle > 0.0) ) && bunny_rotation_angle < 360.0f) {
 		bunny_rotation_angle = min(360.0f, bunny_rotation_angle + 3.0f * speed);
 		transformMatrix = glm::rotate(transformMatrix, glm::radians(bunny_rotation_angle), glm::vec3(0, 1, 0));
+
+		if (bunny_rotation_angle >= 360.0f)
+		{
+			bunny_rotation_angle = 0.0f;
+		}
 	}
 
-	else if (hit_yellow && bunny_rotation_angle >= 360.0f) {
-		hit_yellow = false;
-		bunny_rotation_angle = 0.0f;
-	}
+	// else if (hit_yellow && bunny_rotation_angle >= 360.0f) {
+	// 	hit_yellow = false;
+	// 	bunny_rotation_angle = 0.0f;
+	// }
 
 	if (hit_red) {
 		transformMatrix = glm::rotate(transformMatrix, glm::radians(-90.0f), glm::vec3(1, 0, 0));
@@ -730,10 +734,14 @@ void display()
 	if (-30.0f + box_position_z * speed * 0.7f > -1.0f) {
 		box_position_z = 0.0f;
 		yellow_cube_index = rand() % 3;
+		hit_yellow = false;
 	}
 
-	for (int i = 0; i < 3; i++) {
+	for (int i = 0; i < 3; i++)
+	{
 		float position_x;
+		if (hit_yellow && i == yellow_cube_index) continue;
+
 		switch (i) {
 			case 0:
 				position_x = -2.5f;
