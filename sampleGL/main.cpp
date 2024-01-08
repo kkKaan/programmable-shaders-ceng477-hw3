@@ -746,7 +746,7 @@ void display()
 				break;
 		}
 
-		if (bunny_x < position_x + 0.75f && bunny_x > position_x - 0.75f && -30.0f + box_position_z * speed * 0.7f >= -4.25f) {
+		if (bunny_x < position_x + 0.75f && bunny_x > position_x - 0.75f && -30.0f + box_position_z * speed * 0.7f >= -4.25f && -30.0f + box_position_z * speed * 0.7f <= 0.0f) {
 			if (i == yellow_cube_index) {
 				cout << "You win!" << endl;
 				hit_yellow = true;
