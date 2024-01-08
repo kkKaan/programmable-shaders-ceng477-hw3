@@ -658,7 +658,7 @@ void display()
 				break;
 		}
 
-		if (bunny_x < position_x + 0.75f && bunny_x > position_x - 0.75f && -30.0f + box_position_z * speed * 0.7f >= -4.25f && -30.0f + box_position_z * speed * 0.7f <= -1.5f)
+		if (bunny_x < position_x + 0.75f && bunny_x > position_x - 0.75f && -30.0f + box_position_z * speed * 0.7f >= -4.25f && -30.0f + box_position_z * speed * 0.7f <= -2f)
         {
 			if (i == yellow_cube_index)
             {
@@ -824,6 +824,7 @@ void mainLoop(GLFWwindow* window)
 			bunny_rotation_angle = 0.0f;
 
 			speed = 1.0f;
+            score = 0.0f;
 
 			yellow_cube_index = rand() % 3;
 
