@@ -17,6 +17,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp> 
 #include <ft2build.h>
+#include <ctime>
 #include FT_FREETYPE_H
 
 #define BUFFER_OFFSET(i) ((char*)NULL + (i))
@@ -49,7 +50,9 @@ float offset_before_hit_red;
 float coef_before_hit_red;
 
 int hit_red_index;
-int yellow_cube_index = rand() % 3;
+// initialize yellow_cube_index to a random number between 0 and 2 give time seed
+
+int yellow_cube_index = 0;
 
 bool move_left = false;
 bool move_right = false;
@@ -631,7 +634,7 @@ void renderText(const std::string& text, GLfloat x, GLfloat y, GLfloat scale, gl
 
         GLfloat xpos = x + ch.Bearing.x * scale;
         GLfloat ypos = y - (ch.Size.y - ch.Bearing.y) * scale;
-
+		
         GLfloat w = ch.Size.x * scale;
         GLfloat h = ch.Size.y * scale;
 
@@ -685,7 +688,7 @@ void display()
 	}
 
 	// Adjust bunny_y to move bunny up and down in time
-	bunny_y += 0.01f * speed;
+	bunny_y += 0.008f * speed;
 
 	box_position_z += 0.1f;
 
@@ -712,7 +715,7 @@ void display()
 	}
 
 	// Scale the bunny to 1/10 of its original size
-	transformMatrix = glm::scale(transformMatrix, glm::vec3(0.3f, 0.3f, 0.3f));
+	transformMatrix = glm::scale(transformMatrix, glm::vec3(0.4f, 0.4f, 0.4f));
 
     // Set the active program and the values of its uniform variables for the bunny
     glUseProgram(gProgram[0]);
@@ -925,6 +928,8 @@ int main(int argc, char** argv)   // Create Main Function For Bringing It All To
 	{
 		exit(-1);
 	}
+	srand(static_cast<unsigned int>(time(NULL)));
+	yellow_cube_index = rand() % 3;
 
 	//glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
 	//glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
