@@ -17,7 +17,7 @@ void main() {
     bool xorXY = x != z;
 
     if (xorXY) {
-        fragColor = vec4(0.0, 0.0, 0.0, 1.0); // Black
+        fragColor = vec4(0.31, 0.69, 0.931, 1.0); // Black
     } else {
         fragColor = vec4(1.0, 1.0, 1.0, 1.0); // White
     }

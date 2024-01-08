@@ -63,4 +63,3 @@ void main(void)
     gl_Position = projectionMatrix * viewingMatrix * modelingMatrix * vec4(inVertex, 1);
 	FragPos = gl_Position.xyz;
 }
-
