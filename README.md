@@ -17,9 +17,9 @@ Bunny Run is an OpenGL-based game developed for the Introduction to Computer Gra
 ## Installation
 
 To play Bunny Run, clone the repository to your local machine:
-\```bash
-git clone <repository-url>
-\```
+```bash
+git clone https://github.com/kkKaan/programmable-shaders-ceng477-hw3.git
+```
 Ensure you have the required dependencies installed (see Dependencies section).
 
 ## Gameplay
