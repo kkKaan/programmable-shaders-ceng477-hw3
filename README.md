@@ -37,6 +37,7 @@ Bunny Run features an endlessly hopping bunny that players guide to capture yell
 
 Bunny Run requires the following libraries:
 - OpenGL
+- GLSL
 
 ## Building the Game
 
