@@ -42,10 +42,10 @@ Bunny Run requires the following libraries:
 
 A Makefile is provided for building the game. Navigate to the game's directory and run:
 
-\```bash
+```bash
 make
 ./main
-\```
+```
 
 Ensure the build process is performed on a system compatible with the dependencies, such as Inek machines for METU students.
 
