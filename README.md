@@ -48,7 +48,7 @@ make all
 ./main
 ```
 
-Ensure the build process is performed on a system compatible with the dependencies, such as Inek machines for METU students.
+Ensure the build process is performed on a system compatible with the dependencies.
 
 ## Controls
 
